@@ -59,7 +59,7 @@ def extract_next_links(url, resp):
         if URL_hostname == None:
             URL_hostname = ""
         if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu", URL_hostname):
-            subDomains[URL_hostname] = url_counter  #stores the number of unique pages found in each subdomain
+            subDomains[url] = url_counter  #stores the number of unique pages found in each subdomain
      
     
     # save (write) data to text files while crawling for report data
