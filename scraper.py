@@ -26,7 +26,7 @@ def extract_next_links(url, resp):
         soup = BeautifulSoup(html_content, 'html.parser')
 
         # findall urls listed on this html doc
-        for link in soup.findall('a', href=True):
+        for link in soup.find_all('a', href=True):
             tempLink = link.get('href')
             # link may be incomplete - but!! it may be a complete link
             # to a different domain, so let's check if it's a path first
@@ -84,9 +84,9 @@ def build_report(url, links):
     if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu", parsed.hostname):     # if url is a .ics.uci.edu subdomain, update dict
         sub = parsed.scheme + "://" + parsed.hostname                       # key for subDomains dict
         if sub not in subDomains.keys():
-            subDomain[sub] = len(uniqueTemp)    # if not already in dict, add to dict w value = # of unique links extracted
+            subDomains[sub] = len(uniqueTemp)    # if not already in dict, add to dict w value = # of unique links extracted
         else:
-            subDomain[sub] += len(uniqueTemp)   # else, add # of unique links extracted to value of corresponding key
+            subDomains[sub] += len(uniqueTemp)   # else, add # of unique links extracted to value of corresponding key
     for link in uniqueTemp:
         uniqueURLs.add(link)    # add unique urls to set
     return  
