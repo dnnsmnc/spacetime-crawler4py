@@ -3,7 +3,6 @@ from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 
 visitedURLs = {}  #set of already crawled urls
-uniqueURLs = set()  # set
 subDomains = {}  # dict {url hostname, num of unique urls}
 
 def scraper(url, resp):
@@ -29,6 +28,18 @@ def extract_next_links(url, resp):
         html_content = resp.raw_response.content
         soup = BeautifulSoup(html_content, 'html.parser')
 
+        # check is url is a subdomain of ics.uci.edu
+        mainURL = urlparse(url)
+        URL_hostname = mainURL.hostname
+        subD_flag = False #indicator (for counting unique pages from this page)
+
+        if URL_hostname == None:
+            URL_hostname = ""
+        if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu", URL_hostname):
+            subD_flag = True
+            url_counter = 0
+            uniqueURLs = set()
+        
         # findall urls listed on this html doc
         for link in soup.findall('a', href=True):
             tempLink = link.get('href')
@@ -43,24 +54,26 @@ def extract_next_links(url, resp):
                 
             extractedLinks.append(completeLink)
                 
-         # before adding a url to dict, check if it's valid, not already crawled, unique
-            if is_valid(completeLink):
-                # check uniqueness --> remove fragment
-                completeLink = completeLink.split("#", 1)[0]
+            #only count the number of unique pages if url is a subdomain
+            if subD_flag:
+                # before adding a url as a unique url under a subdomain,
+                # check if it's valid and passes the uniqueness definition.
+                if is_valid(completeLink):
+                    # check uniqueness --> remove fragment
+                    completeLink = completeLink.split("#", 1)[0]
 
-                if completeLink not in uniqueURLs:  #not yet crawled
-                    url_counter += 1
-                    uniqueURLs.add(completeLink)  #might not need to save these b/c we 
-                                                    #just need to specify how many unique urls we found
-
-        # subdomain check
-        mainURL = urlparse(url)
-        URL_hostname = mainURL.hostname
-        if URL_hostname == None:
-            URL_hostname = ""
-        if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu", URL_hostname):
-            subDomains[URL_hostname] = url_counter  #stores the number of unique pages found in each subdomain
-     
+                    # uniqueness definition and not link to itself
+                    if completeLink not in uniqueURLs and completeLink != url:
+                        url_counter += 1
+                        uniqueURLs.add(completeLink)
+        if subD_flag:
+            #now, this subdomain and the number of unique pages are added to the dictionary
+            # remove path
+            subdomainLink = mainURL.scheme + "://" + mainURL.hostname
+            if subdomainLink in subDomains:
+                subDomains[subdomainLink] += url_counter
+            else:
+                subDomains[subdomainLink] = url_counter
     
     # save (write) data to text files while crawling for report data
                     
