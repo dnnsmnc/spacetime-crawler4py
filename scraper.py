@@ -2,28 +2,24 @@ import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 
-visitedURLs = {}  #set of already crawled urls
+
 uniqueURLs = set()  # set
 subDomains = {}  # dict {url hostname, num of unique urls}
 
-def scraper(url, resp):
-    links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
 
+def scraper(url, resp):
+    links = [link for link in extract_next_links(url,resp) if is_valid(link)]
+    build_report(url, links)
+    return links
+
+            
 def extract_next_links(url, resp):
     # Implementation requred.
     extractedLinks = [] 
     
     # only crawl valid urls with status 200-299 OK series
         #https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-    
-    # we don't necessarily need to check if the url is valid in this stage
-    # since is_valid will then be called on the links in extractedLinks
-    
-    # we don't need to check if its already been visited because
-    # the politeness aspect is already set up for us.
-    
-    url_counter = 0
+
     if resp.status >= 200 and resp.status <= 299:
         # use beautiful soup here to get html content
         html_content = resp.raw_response.content
@@ -41,35 +37,15 @@ def extract_next_links(url, resp):
             else:                               # relative url - always relative to the base url so
                 completeLink = urljoin(url, tempLink)       # we can simply urljoin  with original url
                 
+            completeLink = completeLink.split("#", 1)[0]
             extractedLinks.append(completeLink)
-                
-         # before adding a url to dict, check if it's valid, not already crawled, unique
-            if is_valid(completeLink):
-                # check uniqueness --> remove fragment
-                completeLink = completeLink.split("#", 1)[0]
-
-                if completeLink not in uniqueURLs:  #not yet crawled
-                    url_counter += 1
-                    uniqueURLs.add(completeLink)  #might not need to save these b/c we 
-                                                    #just need to specify how many unique urls we found
-
-        # subdomain check
-        mainURL = urlparse(url)
-        URL_hostname = mainURL.hostname
-        if URL_hostname == None:
-            URL_hostname = ""
-        if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu", URL_hostname):
-            subDomains[url] = url_counter  #stores the number of unique pages found in each subdomain
-     
-    
-    # save (write) data to text files while crawling for report data
                     
     return extractedLinks
+
 
 def is_valid(url):
     try:
         # remove fragment
-        url = url.split("#", 1)[0]
         parsed = urlparse(url)
         
         if parsed.scheme not in set(["http", "https"]):
@@ -101,3 +77,18 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+
+def build_report(url, links):
+    uniqueTemp = [link for link in links if link not in uniqueURLs]     # temporary list of unique extracted links
+    parsed = urlparse(url)
+    if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu", parsed.hostname):     # if url is a .ics.uci.edu subdomain, update dict
+        sub = parsed.scheme + "://" + parsed.hostname                       # key for subDomains dict
+        if sub not in subDomains.keys():
+            subDomain[sub] = len(uniqueTemp)    # if not already in dict, add to dict w value = # of unique links extracted
+        else:
+            subDomain[sub] += len(uniqueTemp)   # else, add # of unique links extracted to value of corresponding key
+    for link in uniqueTemp:
+        uniqueURLs.add(link)    # add unique urls to set
+    return  
+       
