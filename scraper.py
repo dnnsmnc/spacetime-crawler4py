@@ -28,6 +28,15 @@ def extract_next_links(url, resp):
         html_content = resp.raw_response.content
         soup = BeautifulSoup(html_content, 'html.parser')
 
+        # Q1 check if url is within specified domains
+        url_in_scope = False
+        if is_valid(url):
+            url_in_scope = True
+
+        # Q1 add if new url
+        if url not in visitedURLs and url_in_scope:
+            visitedURLs.add(url)
+        
         # check is url is a subdomain of ics.uci.edu
         mainURL = urlparse(url)
         URL_hostname = mainURL.hostname
@@ -53,7 +62,23 @@ def extract_next_links(url, resp):
                 completeLink = urljoin(url, tempLink)       # we can simply urljoin  with original url
                 
             extractedLinks.append(completeLink)
-                
+            
+            # Q1
+            '''
+            Reference: https://stackoverflow.com/questions/942751/is-it-always-safe-to-remove-a-trailing-slash-from-a-url
+            Sometimes the same url with a trailing slash leads to a directory
+            and without a trailing slash leads to a file. So, we decided to count 
+            the same urls with vs without a trailing slash as two different urls.
+            This still follows the Uniqueness definition stated in the assignment prompt.
+            '''
+            # print(completeLink)
+            if is_valid(completeLink):
+                # check uniqueness --> remove fragment
+                completeLink = completeLink.split("#", 1)[0]
+                # uniqueness definition and not link to itself
+                if completeLink not in visitedURLs:
+                    visitedURLs.add(completeLink)
+            
             #only count the number of unique pages if url is a subdomain
             if subD_flag:
                 # before adding a url as a unique url under a subdomain,
