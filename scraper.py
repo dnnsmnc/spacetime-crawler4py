@@ -22,7 +22,7 @@ def extract_next_links(url, resp):
     # we don't need to check if its already been visited because
     # the politeness aspect is already set up for us.
     
-    url_counter = 0
+   
     if resp.status >= 200 and resp.status <= 299:
         # use beautiful soup here to get html content
         html_content = resp.raw_response.content
