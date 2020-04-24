@@ -10,7 +10,7 @@ longest_page = ()   # tuple (url, length)
 
 def scraper(url, resp):
     parsed = urlparse(url)
-    sub = parsed.scheme + "://" + parsed.hostname  # key for subDomains dict
+    sub = "http://" + parsed.hostname  # key for subDomains dict
     if resp.status < 400:
         links = [link for link in extract_next_links(url, resp) if is_valid(link)]
         update_info(url, links)
@@ -127,7 +127,7 @@ def update_info(url, links):
     parsed = urlparse(url)
     if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu",
                 parsed.hostname):  # if url is a .ics.uci.edu subdomain, update dict
-        sub = parsed.scheme + "://" + parsed.hostname  # key for subDomains dict
+        sub = "http://" + parsed.hostname  # key for subDomains dict
         if sub not in subDomains.keys():
             subDomains[sub] = len(
                 uniqueTemp)  # if not already in dict, add to dict w value = # of unique links extracted
