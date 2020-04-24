@@ -91,20 +91,30 @@ def extract_next_links(url, resp):
 
 def is_similar(completeLink):
     # Avoid these traps urls
-    if "www.ics.uci.edu/alumni/stayconnected" in completeLink:
+    if "stayconnected" in completeLink:
         completeLink = completeLink.split("/stayconnected", 1)[0]
+        return completeLink
+    if "hall_of_fame" in completeLink:
+        completeLink = completeLink.split("/hall_of_fame", 1)[0]
         return completeLink
     if "www.ics.uci.edu/index.php" in completeLink:
         completeLink = completeLink.split("/vod", 1)[0]
         return completeLink
-    if "cbcl.ics.uci.edu/public_data/wgEncodeBroadHistone" in completeLink:
-        completeLink = completeLink.split("/wgEncodeBroadHistone", 1)[0]
-        return completeLink
+    if "cbcl.ics.uci.edu" in completeLink:
+        if "/public_data/wgEncodeBroadHistone" in completeLink:
+            completeLink = completeLink.split("/wgEncodeBroadHistone", 1)[0]
+            return completeLink
+        if ".edu/doku.php/people?rev=1418330812&do=diff" in completeLink:
+            completeLink = completeLink.split("=diff", 1)[0]
+            return completeLink
     if "wics.ics.uci.edu/events" in completeLink:
         completeLink = completeLink.split("/events", 1)[0]
         return completeLink
     if "ics.uci.edu/accessibility" in completeLink:
         completeLink = completeLink.split("/accessibility", 1)[0]
+        return completeLink
+    if "www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
+        completeLink = completeLink.split("/~kay", 1)[0]
         return completeLink
 
     return completeLink
