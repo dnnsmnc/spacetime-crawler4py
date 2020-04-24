@@ -26,7 +26,7 @@ def page_token(url):
             text = soup.get_text()
             text = text.strip().lower().split()
             for i in text:
-                if i in stop_words:
+                if i in stop_words or len(i) < 3:
                     text.remove(i)
                 else:
                     if i not in scraper.words:
