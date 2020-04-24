@@ -104,8 +104,8 @@ def is_similar(completeLink):
         if "/public_data/wgEncodeBroadHistone" in completeLink:
             completeLink = completeLink.split("/wgEncodeBroadHistone", 1)[0]
             return completeLink
-        if ".edu/doku.php/people?rev=1418330812&do=diff" in completeLink:
-            completeLink = completeLink.split("=diff", 1)[0]
+        if ".edu/doku.php/people?rev=" in completeLink:
+            completeLink = completeLink.split("?rev", 1)[0]
             return completeLink
     if "wics.ics.uci.edu/events" in completeLink:
         completeLink = completeLink.split("/events", 1)[0]
@@ -113,10 +113,12 @@ def is_similar(completeLink):
     if "ics.uci.edu/accessibility" in completeLink:
         completeLink = completeLink.split("/accessibility", 1)[0]
         return completeLink
+    if "grape.ics.uci.edu/wiki/asterix/wiki/stats170ab-2018?version=" in completeLink: # ""www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
+        completeLink = completeLink.split("?version", 1)[0]
+        return completeLink
     if "www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
         completeLink = completeLink.split("/~kay", 1)[0]
         return completeLink
-
     return completeLink
 
 def is_valid(url):
