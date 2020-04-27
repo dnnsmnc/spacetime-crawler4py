@@ -1,5 +1,7 @@
 import re
+import urllib
 from urllib.parse import urlparse, urljoin
+
 
 from bs4 import BeautifulSoup
 # Downloads the data.
@@ -11,26 +13,39 @@ nltk.download('stopwords')
 from nltk.corpus import stopwords
 
 # Initialize the stopwords
-stoplist = stopwords.words('english')
-
+stoplist = set(stopwords.words('english'))
+lowInfo = False
+visitedURLs = set()
 uniqueURLs = set()  # set
 subDomains = {}  # dict {url hostname, num of unique urls}
-visitedURLs = set()  #set of already crawled urls
 
-fifty_words = list()
+fifty_words = dict()
 longestPage = ""
 longestWords = 0
-cur_wordCount = 0
+
+
 
 def scraper(url, resp):
-    links = [link for link in extract_next_links(url, resp) if is_valid(link)]
-    build_report(url, links)
-    output()
-    return links
+    if resp.status < 400:
+        links = [link for link in extract_next_links(url, resp) if is_valid(link)]
+        build_report(url, links)
+        output()
+        return links
+    else:
+        parsed = urlparse(url)
+        if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu",parsed.hostname):  # if url is a .ics.uci.edu subdomain, update dict
+            # use http for all to avoid double keys of same subdomain
+            sub = "http://" + parsed.hostname  # key for subDomains dict
+            if sub in subDomains and url in uniqueURLs:
+                    subDomains[sub] -= 1
+        if url in uniqueURLs:
+            uniqueURLs.remove(url)
+        return []
+
 
 
 def extract_next_links(url, resp):
-    global longestWords,longestPage, fifty_words
+    global longestWords,longestPage
     # Implementation requred.
     extractedLinks = []
 
@@ -38,59 +53,66 @@ def extract_next_links(url, resp):
     # http://www.ics.uci.edu/~kay/scheme/restaurants2.scm
 
     if resp.status >= 200 and resp.status <= 299:
-        # avoid similar pages and traps
-       # if url not in visitedURLs:
-           # visitedURLs.add(url)
+        # avoid crawling the same page twice
+        if url not in visitedURLs:
+            visitedURLs.add(url)
 
-        # use beautiful soup here to get html content
-        html_content = resp.raw_response.content
-        soup = BeautifulSoup(html_content, 'html.parser')
+            # use beautiful soup here to get html content
+            html_content = resp.raw_response.content
+            soup = BeautifulSoup(html_content, 'html.parser')
+            # parse text and avoid low info pages
+            pageLength = page_token(url)
+            if pageLength == 0:
+                return []
 
-        for script in soup(["script", "style"]):
-            script.extract()
-        text = soup.get_text()
-        TopCommon_words = page_token(text)
+            # longest page
+            if pageLength > longestWords:
+                longestPage = url
+                longestWords = pageLength
 
-        if len(fifty_words) == 0:
-            fifty_words.extend(TopCommon_words)
-        else:
-            fifty_words.clear()
-            fifty_words.extend(getCommonWords(TopCommon_words))
+            #print("LENGTH OF 50 --> " + str(len(fifty_words)))
 
-        # Q3) longest page
-        if longestWords < cur_wordCount:
-            longestPage = url
-            longestWords = cur_wordCount
+            # findall urls listed on this html doc
+            for link in soup.find_all('a', href=True):
+                tempLink = link.get('href')
+                # link may be incomplete - but!! it may be a complete link
+                # to a different domain, so let's check if it's a path first
+                # by checking if its an "absolute" url or a "relative" url
+                #       https://html.com/anchors-links/#Absolute_vs_Relative_URLs
+                if tempLink.startswith("http"):  # absolute url will always have scheme
+                    completeLink = tempLink
+                else:  # relative url - always relative to the base url so
+                    completeLink = urljoin(url,
+                                           tempLink)  # we can simply urljoin  with original url
 
-        # findall urls listed on this html doc
-        for link in soup.find_all('a', href=True):
-            tempLink = link.get('href')
-            # link may be incomplete - but!! it may be a complete link
-            # to a different domain, so let's check if it's a path first
-            # by checking if its an "absolute" url or a "relative" url
-            #       https://html.com/anchors-links/#Absolute_vs_Relative_URLs
-            if tempLink.startswith("http"):  # absolute url will always have scheme
-                completeLink = tempLink
-            else:  # relative url - always relative to the base url so
-                completeLink = urljoin(url,
-                                       tempLink)  # we can simply urljoin  with original url
+                completeLink = completeLink.split("#", 1)[0]
+                # avoid calendar traps
+                # https://today.uci.edu/department/information_computer_sciences/calendar
+                if "/calendar" in completeLink:
+                    completeLink = completeLink.split("/calendar", 1)[0]
+                    return completeLink
+                #AVOID similar links
+                if "ics.uci.edu" in completeLink:
+                    if "evoke" in completeLink and "replytocom" in completeLink:
+                        completeLink = completeLink.split("?",1)[0]
+                    else:
+                        completeLink = is_similar(completeLink)
 
-            completeLink = completeLink.split("#", 1)[0]
-            #AVOID similar links
-            if "ics.uci.edu" in completeLink:
-                if "evoke" in completeLink and "replytocom" in completeLink:
-                    completeLink = completeLink.split("?",1)[0]
-                else:
-                    completeLink = is_similar(completeLink)
+                #if "www.informatics.uci.edu/files/pdf/InformaticsBrochure-March2018" in completeLink:
+                   # completeLink = completeLink.split("/pdf", 1)[0]
 
-            # http://www.ics.uci.edu/~kay/wordlist.txt --> long list of all words
+                # http://www.ics.uci.edu/~kay/wordlist.txt --> long list of all words
 
-            extractedLinks.append(completeLink)
+                extractedLinks.append(completeLink)
 
     return extractedLinks
 
 def is_similar(completeLink):
     # Avoid these traps urls
+
+    if "wics.ics.uci.edu/events" in completeLink:
+        completeLink = completeLink.split("/events", 1)[0]
+        return completeLink
     if "stayconnected" in completeLink:
         completeLink = completeLink.split("/stayconnected", 1)[0]
         return completeLink
@@ -107,18 +129,21 @@ def is_similar(completeLink):
         if ".edu/doku.php/people?rev=" in completeLink:
             completeLink = completeLink.split("?rev", 1)[0]
             return completeLink
-    if "wics.ics.uci.edu/events" in completeLink:
-        completeLink = completeLink.split("/events", 1)[0]
-        return completeLink
     if "ics.uci.edu/accessibility" in completeLink:
         completeLink = completeLink.split("/accessibility", 1)[0]
         return completeLink
-    if "grape.ics.uci.edu/wiki/asterix/wiki/stats170ab-2018?version=" in completeLink: # ""www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
-        completeLink = completeLink.split("?version", 1)[0]
+    if "grape.ics.uci.edu/wiki/asterix/wiki/stats170ab-2018?" in completeLink: # ""www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
+        completeLink = completeLink.split("?", 1)[0]
         return completeLink
-    if "www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
-        completeLink = completeLink.split("/~kay", 1)[0]
+    if "archive.ics.uci.edu/ml/machine-learning-databases/" in completeLink:
+        completeLink = "http://archive.ics.uci.edu/ml/machine-learning-databases"
         return completeLink
+    if "archive.ics.uci.edu/ml/datasets.php?" in completeLink:
+        completeLink = completeLink.split("?", 1)[0]
+        return completeLink
+    #if "www.ics.uci.edu/~kay/wordlist.txt" in completeLink:
+     #   completeLink = completeLink.split("/~kay", 1)[0]
+    #    return completeLink
     return completeLink
 
 def is_valid(url):
@@ -128,10 +153,16 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
 
+        if ".jpg" in url:  # not catching jpg for some reason
+            return False
+
+        if "do=revisions" in url:
+            return False
+
         checkext = not re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
+            r".*\.(css|js|bmp|gif|jpe?g|jpg|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
-            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
+            + r"|wav|avi|mov|mpeg|ram|m4v|mat|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|ppsx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
@@ -158,44 +189,43 @@ def is_valid(url):
         print("TypeError for ", parsed)
         raise
 
+def page_token(url):
 
-def page_token(text):
-    global cur_wordCount
+    try:
+        global fifty_words, longestWords, longestPage, lowInfo
+        pageLength = 0
+        response = urllib.request.urlopen(url)
+        if response.getcode() >= 200 and response.getcode() <= 299:
+            html_content = response.read()
+            soup = BeautifulSoup(html_content, 'html.parser')
+            for script in soup(["script", "style"]):
+                script.extract()
 
+            text = soup.get_text()
+            text = text.strip().lower().split()
 
-    text = text.strip().lower().split()
-    num = dict()
-    word_count = 0
-    for i in text:
-        if i in stoplist:
-            text.remove(i)
-        else:
-            if i not in num:
-                num[i] = text.count(i)
-        word_count += 1
+            # avoid low info pages
+            if len(text) < 200:
+                lowInfo = True
+                return 0
 
-    num = sorted(num.items(), key=lambda x: x[1], reverse=True)
+            for i in text:
+                if i in stoplist or len(i) < 3:
+                    text.remove(i)
+                else:
+                    pageLength += 1
+                    if i not in fifty_words:
+                        fifty_words[i] = 1
+                    else:
+                        fifty_words[i] += 1
 
-    if len(num) <= 50:
-        top_fifty = num
-    else:
-        top_fifty = num[0 - 49]
-    cur_wordCount = word_count
-    return top_fifty
+            if len(text) > longestWords:
+                longestPage = url
+                longestWords = len(text)
 
-def getCommonWords(TopCommon_words):
-    """
-    :param tokens_1: list, tokens_2: list
-    :return: none
-    Finds intersection of the two sets and prints its length.
-    """
-    t1 = set(fifty_words)
-    t2 = set(TopCommon_words)
-    commonWords = []
-    for word in t1:
-        if word in t2:
-            commonWords.append(word)
-    return commonWords
+    except:
+        return 0
+    return pageLength
 
 def build_report(url, links):
     uniqueTemp = [link for link in links if
@@ -226,29 +256,24 @@ def build_report(url, links):
 
 def output():
     # write uniqueURLs to txt file
-    with open("unique_q1.txt", "w") as file:
-            file.write("Q1)\n" + str(len(uniqueURLs)) + " unique URLs found.\n")
+    with open("report.txt", "w") as file:
+        file.write("Q1)\n" + str(len(uniqueURLs)) + " unique URLs found.\n\n")
 
-    with open("q_2and3.txt", "w") as file2:
-        file2.write("Q2)\n")
-        file2.write("Longest page: " + longestPage + "\n\n")
+        file.write("Q2)\n")
+        file.write("Longest page: " + longestPage + "  " + str(
+            longestWords) + " words\n\n")
+        file.write("Q3)\n")
+        file.write("50 most common words:\n")
+        c = 0
+        for token, count in sorted(fifty_words.items(), key=lambda x: x[1],
+                                   reverse=True):
+            if c >= 50:
+                break
+            file.write(token + " : " + str(count) + "\n")
+            c += 1
+        file.write("Number of unique words: " + str(len(fifty_words)) + "\n\n")
 
-    '''
-    # Q2
-        with open("q_2and3.txt", "w") as file2:
-            file2.write("Q2)\n")
-            file2.write("Longest page: " + longestPage + "\n\n")
-            file2.write("Q3)\n")
-            file2.write("50 most common words:\n")
-            for word in fifty_words:
-                file2.write(str(word[0]))
-                file2.write("\n")
-    
-    '''
-
-
-    # write subdomain to txt file
-    with open("subdomains_q4.txt", "w") as file1:
-        file1.write("Q4)\n")
+        file.write("Q4)\n")
+        file.write("Subdomain , number of unique pages\n\n")
         for url, num in sorted(subDomains.items()):
-            file1.write(url + ", " + str(num) + "\n")
+            file.write(url + ", " + str(num) + "\n")
