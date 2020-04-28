@@ -150,6 +150,12 @@ def is_valid(url):
     try:
         parsed = urlparse(url)
 
+        pathnames = (parsed.path).split("/")
+
+        for path in pathnames:
+            if pathnames.count(path) > 1:
+                return False
+        
         if parsed.scheme not in set(["http", "https"]):
             return False
 
