@@ -13,7 +13,8 @@ def scraper(url, resp):
     sub = "http://" + parsed.hostname  # key for subDomains dict
     if resp.status < 400:
         links = [link for link in extract_next_links(url, resp) if is_valid(link)]
-        update_info(url, links)
+        if links != []:
+            update_info(url, links)
         if sub not in links:
             links.append(sub)
         return links
@@ -34,10 +35,14 @@ def extract_next_links(url, resp):
     # only crawl valid urls with status 200-299 OK series
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 
+
     if resp.status >= 200 and resp.status <= 299:
         # use beautiful soup here to get html content
         html_content = resp.raw_response.content
         soup = BeautifulSoup(html_content, 'html.parser')
+
+        if page_token(url) < 200:
+            return []
 
         # findall urls listed on this html doc
         for link in soup.find_all('a', href=True):
@@ -61,6 +66,9 @@ def extract_next_links(url, resp):
 
             if "do=diff" in completeLink:
                 completeLink = completeLink.split("&", 1)[0]
+
+            if "/calendar" in completeLink:
+                completeLink = completeLink.split("/calendar", 1)[0]
 
             extractedLinks.append(completeLink)
 
@@ -122,7 +130,8 @@ def is_valid(url):
 
 def update_info(url, links):
     temp = page_token(url)
-
+    if temp < 200:
+        return
     uniqueTemp = [link for link in links if link not in uniqueURLs]  # temporary list of unique extracted links
     parsed = urlparse(url)
     if re.match(r"(www.)?[-a-z0-9.]+\.ics\.uci\.edu",
@@ -136,3 +145,4 @@ def update_info(url, links):
     for link in uniqueTemp:
         uniqueURLs.add(link)  # add unique urls to set
     return
+
